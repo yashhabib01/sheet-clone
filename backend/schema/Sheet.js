@@ -23,6 +23,10 @@ const sheetSchema = new mongoose.Schema(
       type: Object,
       default: {},
     },
+    cellValidations: {
+      type: Object,
+      default: {},
+    },
   },
   {
     timestamps: true, // This will add createdAt and updatedAt fields

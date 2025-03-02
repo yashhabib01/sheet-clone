@@ -52,7 +52,8 @@ const getSheetById = async (req, res) => {
 const updateSheet = async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, cellStyles, rowHeights, columnWidths } = req.body;
+    const { data, cellStyles, rowHeights, columnWidths, cellValidations } =
+      req.body;
 
     const updatedSheet = await Sheet.findByIdAndUpdate(
       id,
@@ -62,9 +63,10 @@ const updateSheet = async (req, res) => {
           cellStyles: cellStyles || {},
           rowHeights: rowHeights || {},
           columnWidths: columnWidths || {},
+          cellValidations: cellValidations || {},
         },
       },
-      { new: true } // Return updated document
+      { new: true }
     );
 
     if (!updatedSheet) {

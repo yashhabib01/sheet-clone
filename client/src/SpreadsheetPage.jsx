@@ -8,6 +8,7 @@ import { getSheetById, updateSheet } from './services/sheetService'
 import SpreadsheetToolbar from './components/SpreadsheetToolbar'
 
 import SimpleSpreadsheetGrid from './components/SimpleSpreadsheetGrid'
+import { format, isValid, parse } from 'date-fns'
 
 function SpreadsheetPage() {
   const [activeCell, setActiveCell] = useState(null)
@@ -133,7 +134,6 @@ function SpreadsheetPage() {
   };
 
   const handleCellChange = (cellId, value) => {
-    
     setFormulaBarValue(value);
     setIsFormulaSelecting(value.startsWith('='));
 
@@ -157,11 +157,18 @@ function SpreadsheetPage() {
         }));
       }
     } else {
+      let displayValue = value;
+      
+      // Handle date formatting if the cell has date validation
+      if (cellValidations[cellId] === 'DATE' && value) {
+        displayValue = formatDateValue(value);
+      }
+
       setSpreadsheetData(prev => ({
         ...prev,
         [cellId]: {
           value: value,
-          displayValue: value
+          displayValue: displayValue
         }
       }));
     }
@@ -261,7 +268,7 @@ function SpreadsheetPage() {
     setSpreadsheetData(newData);
   };
 
-  const handleSetValidation = (range) => {
+  const handleSetValidation = (range, type) => {
     const [start, end] = range.split(':');
     const startCol = start.match(/[A-Z]+/)[0];
     const startRow = parseInt(start.match(/\d+/)[0]);
@@ -273,7 +280,19 @@ function SpreadsheetPage() {
     for (let row = startRow; row <= endRow; row++) {
       for (let col = startCol.charCodeAt(0); col <= endCol.charCodeAt(0); col++) {
         const cellId = `${String.fromCharCode(col)}${row}`;
-        newValidations[cellId] = 'NUMBER';
+        newValidations[cellId] = type;
+        
+        // Format existing data if it's a date validation
+        if (type === 'DATE' && spreadsheetData[cellId]?.value) {
+          const formattedDate = formatDateValue(spreadsheetData[cellId].value);
+          setSpreadsheetData(prev => ({
+            ...prev,
+            [cellId]: {
+              value: spreadsheetData[cellId].value,
+              displayValue: formattedDate
+            }
+          }));
+        }
       }
     }
 
@@ -303,6 +322,45 @@ function SpreadsheetPage() {
     setSelectedRange(range);
   };
 
+  const formatDateForStorage = (data) => {
+    const formattedData = {};
+    
+    Object.entries(data).forEach(([cellId, cellData]) => {
+      if (cellValidations[cellId] === 'DATE' && cellData.value && !cellData.value.startsWith('=')) {
+        // Format the date for storage while keeping the original input
+        const displayValue = formatDateValue(cellData.value);
+        formattedData[cellId] = {
+          value: cellData.value,
+          displayValue: displayValue
+        };
+      } else {
+        formattedData[cellId] = cellData;
+      }
+    });
+    
+    return formattedData;
+  };
+
+  const formatDateValue = (value) => {
+    if (!value) return '';
+    
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+    
+    const dateFormats = ['yyyy-MM-dd', 'MM/dd/yyyy', 'dd/MM/yyyy', 'MM-dd-yyyy'];
+    let date = null;
+    
+    for (const dateFormat of dateFormats) {
+      date = parse(value, dateFormat, new Date());
+      if (isValid(date)) break;
+    }
+    
+    if (isValid(date)) {
+      return format(date, 'dd/MM/yyyy');
+    }
+    
+    return value;
+  };
+
   useEffect(() => {
     const loadSheetData = async () => {
       try {
@@ -312,6 +370,7 @@ function SpreadsheetPage() {
         setCellStyles(sheet.cellStyles || {});
         setRowHeights(sheet.rowHeights || {});
         setColumnWidths(sheet.columnWidths || {});
+        setCellValidations(sheet.cellValidations || {});
       } catch (error) {
         console.error('Error loading sheet:', error);
       } finally {
@@ -326,11 +385,13 @@ function SpreadsheetPage() {
     console.log("Saving sheet...");
     try {
       setIsLoading(true);
+      const formattedData = formatDateForStorage(spreadsheetData);
       await updateSheet(id, {
-        data: spreadsheetData,
+        data: formattedData,
         cellStyles,
         rowHeights,
-        columnWidths
+        columnWidths,
+        cellValidations,
       });
     } catch (error) {
       console.error('Error saving sheet:', error);
@@ -338,9 +399,6 @@ function SpreadsheetPage() {
       setIsLoading(false);
     }
   };
-
- 
-  
 
   return (
     <ThemeProvider theme={theme}>

@@ -1,10 +1,11 @@
-import { Box } from '@mui/material';
+import { Box, Tooltip } from '@mui/material';
 import { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { evaluateFormula, findAndReplace, handleRemoveDuplicates } from '../utils/spreadsheetFunctions';
 import ContextMenu from './ContextMenu';
 import ResizeDialog from './ResizeDialog';
 import FindReplaceDialog from './FindReplaceDialog';
+import { format, isValid, parse } from 'date-fns';
 
 const COLUMNS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
 const ROWS = 100;
@@ -269,7 +270,14 @@ const SimpleSpreadsheetGrid = ({
 
   const handleInputBlur = () => {
     if (editingCell) {
-      onCellChange(editingCell, editValue);
+      let finalValue = editValue;
+      
+      // Format date if the cell has date validation
+      if (cellValidations[editingCell] === 'DATE') {
+        finalValue = formatDateValue(editValue);
+      }
+      
+      onCellChange(editingCell, finalValue);
       setEditingCell(null);
       setEditValue('');
       setIsFormulaSelecting(false);
@@ -475,21 +483,109 @@ const SimpleSpreadsheetGrid = ({
     onGridUpdate(updatedData);
   };
 
+  // Add this helper function to format dates
+  const formatDateValue = (value) => {
+    if (!value) return '';
+    
+    // If it's already a formatted date string in dd/MM/yyyy format, return as is
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+    
+    // Try parsing different date formats
+    const dateFormats = ['yyyy-MM-dd', 'MM/dd/yyyy', 'dd/MM/yyyy', 'MM-dd-yyyy'];
+    let date = null;
+    
+    for (const dateFormat of dateFormats) {
+      date = parse(value, dateFormat, new Date());
+      if (isValid(date)) break;
+    }
+    
+    // If it's a valid date, format it as dd/MM/yyyy
+    if (isValid(date)) {
+      return format(date, 'dd/MM/yyyy');
+    }
+    
+    return value;
+  };
+
+  // Update the isValidValue function
+  const isValidValue = (value, type) => {
+    if (!value || value.startsWith('=')) return true;
+    
+    switch(type) {
+      case 'NUMBER':
+        return !isNaN(Number(value));
+      case 'EMAIL':
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      case 'DATE': {
+        const dateFormats = ['yyyy-MM-dd', 'MM/dd/yyyy', 'dd/MM/yyyy', 'MM-dd-yyyy'];
+        for (const dateFormat of dateFormats) {
+          const parsedDate = parse(value, dateFormat, new Date());
+          if (isValid(parsedDate)) return true;
+        }
+        return false;
+      }
+      case 'TEXT':
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  // Update the getValidationError function
+  const getValidationError = (value, type) => {
+    if (!value || value.startsWith('=')) return null;
+    
+    switch(type) {
+      case 'NUMBER':
+        return isNaN(Number(value)) ? 'Please enter a valid number' : null;
+      case 'EMAIL':
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? 
+          null : 'Please enter a valid email address';
+      case 'DATE':
+        return isValidValue(value, 'DATE') ? 
+          null : 'Please enter a valid date (dd/MM/yyyy)';
+      case 'TEXT':
+        return null;
+      default:
+        return null;
+    }
+  };
+
   const renderCell = (cellId) => {
     const isActive = cellId === activeCell;
     const isSelected = isInSelectionRange(cellId);
     const isInFormulaSelectionVar = isInFormulaSelection(cellId);
     const cellStyle = cellStyles[cellId];
     
-    // Get row and column from cellId
     const col = cellId.match(/[A-Z]+/)[0];
     const row = parseInt(cellId.match(/\d+/)[0]);
 
-    // Get custom width and height if set
     const width = columnWidths[col] || DEFAULT_CELL_WIDTH;
     const height = rowHeights[row] || DEFAULT_CELL_HEIGHT;
 
-    return (
+    const validationType = cellValidations[cellId];
+    const value = data[cellId]?.value || '';
+    const validationError = validationType ? getValidationError(value, validationType) : null;
+    const isValid = !validationError;
+
+    const displayValue = () => {
+      const value = data[cellId]?.value || '';
+      if (!value) return '';
+      
+      // If it's a formula, return the display value
+      if (value.startsWith('=')) {
+        return data[cellId]?.displayValue || '';
+      }
+      
+      // If it has date validation, try to format as date
+      if (validationType === 'DATE') {
+        return formatDateValue(value);
+      }
+      
+      return value;
+    };
+
+    const cellContent = (
       <Cell
         key={cellId}
         cellStyle={cellStyle}
@@ -507,11 +603,12 @@ const SimpleSpreadsheetGrid = ({
                   isInFormulaSelectionVar ? '2px solid rgba(26, 115, 232, 0.5)' : 'none',
           zIndex: isActive ? 1 : 'auto',
           cursor: isFormulaSelecting ? 'crosshair' : 'default',
+          border: validationType && !isValid ? '2px solid #d32f2f' : '1px solid #e0e0e0',
         }}
       >
         {editingCell === cellId ? (
           <input
-            type="text"
+            type={validationType === 'DATE' ? 'text' : 'text'}
             value={editValue}
             onChange={handleInputChange}
             onBlur={handleInputBlur}
@@ -531,19 +628,59 @@ const SimpleSpreadsheetGrid = ({
               outline: 'none',
               backgroundColor: 'transparent',
             }}
+            placeholder={validationType === 'DATE' ? 'dd/MM/yyyy' : ''}
             autoFocus
           />
         ) : (
           <span style={{ 
             width: '100%',
             textAlign: cellStyle?.textAlign || 'left',
-            display: 'block' // Add this to ensure the span takes full width
+            display: 'block'
           }}>
-            {getCellDisplayValue(cellId)}
+            {displayValue()}
           </span>
+        )}
+        
+        {validationType && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: 0,
+              height: 0,
+              borderStyle: 'solid',
+              borderWidth: '0 8px 8px 0',
+              borderColor: `transparent ${!isValid ? '#d32f2f' : '#888'} transparent transparent`,
+            }}
+          />
         )}
       </Cell>
     );
+
+    // Wrap cell with tooltip if there's a validation error
+    return validationType && !isValid ? (
+      <Tooltip 
+        key={cellId}
+        title={
+          <Box>
+            <Box sx={{ fontWeight: 'bold', mb: 0.5 }}>
+              Validation Error
+            </Box>
+            <Box>
+              {validationError}
+            </Box>
+            <Box sx={{ mt: 0.5, fontSize: '0.8em', color: '#ccc' }}>
+              Expected type: {validationType.toLowerCase()}
+            </Box>
+          </Box>
+        }
+        placement="top"
+        arrow
+      >
+        {cellContent}
+      </Tooltip>
+    ) : cellContent;
   };
 
   useEffect(() => {

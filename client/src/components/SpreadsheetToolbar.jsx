@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, IconButton, Divider, Box, ButtonGroup, Select, MenuItem, InputLabel, FormControl, Button, Tooltip, TextField, Dialog, Typography } from '@mui/material';
+import { IconButton, Divider, Box, ButtonGroup, Select, MenuItem, InputLabel, FormControl, Button, Tooltip, TextField, Dialog, Typography, DialogTitle, DialogContent, DialogActions, FormControlLabel, RadioGroup, Radio } from '@mui/material';
 import {
   FormatBold,
   FormatItalic,
@@ -13,6 +13,7 @@ import FindReplaceIcon from '@mui/icons-material/FindReplace';
 import RuleIcon from '@mui/icons-material/Rule';
 import NumbersIcon from '@mui/icons-material/Numbers';
 import SaveIcon from '@mui/icons-material/Save';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { useState } from 'react';
 import styled from '@emotion/styled';
 import { CircularProgress } from '@mui/material';
@@ -54,6 +55,8 @@ const SpreadsheetToolbar = ({
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
+  const [validationDialog, setValidationDialog] = useState(false);
+  const [validationType, setValidationType] = useState('text');
 
   const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 44, 48];
   const colors = [
@@ -83,15 +86,24 @@ const SpreadsheetToolbar = ({
     onFindReplace();
   };
 
+  const handleSetValidation = () => {
+    if (!selectedRange) {
+      alert('Please select a range first');
+      return;
+    }
+    onSetValidation(selectedRange, validationType.toUpperCase());
+    setValidationDialog(false);
+  };
+
   return (
     <Box>
       {/* Top toolbar with formatting buttons */}
       <Box sx={{ 
-        padding: 1, 
+        padding: 0.5,
         borderBottom: '1px solid #e0e0e0', 
         display: 'flex', 
         alignItems: 'center',
-        gap: 1,
+        gap: 0.5,
         backgroundColor: '#f8f9fa'
       }}>
         <Box display="flex" gap={1}>
@@ -218,39 +230,112 @@ const SpreadsheetToolbar = ({
 
           <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
 
-          <Button
-            variant="outlined"
-            startIcon={<ContentCopyIcon />}
-            onClick={handleRemoveDuplicatesClick}
-            size="small"
-            disabled={!selectedRange}
-          >
-            Remove Duplicates
-          </Button>
+          <Box sx={{ 
+            display: 'flex', 
+            gap: 2,
+            ml: 'auto',
+            mr: 1
+          }}>
+            <Tooltip title="Remove Duplicates">
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleRemoveDuplicatesClick}
+                disabled={!selectedRange}
+                startIcon={<DeleteSweepIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  backgroundColor: '#5c6bc0',
+                  '&:hover': {
+                    backgroundColor: '#3f51b5',
+                  },
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5,
+                  fontSize: '0.75rem',
+                  textTransform: 'none'
+                }}
+              >
+                Duplicates
+              </Button>
+            </Tooltip>
 
-          <Button
-            variant="outlined"
-            startIcon={<FindReplaceIcon />}
-            onClick={handleFindReplaceClick}
-            size="small"
-            disabled={!selectedRange}
-          >
-            Find & Replace
-          </Button>
+            <Tooltip title="Find and Replace">
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleFindReplaceClick}
+                disabled={!selectedRange}
+                startIcon={<FindReplaceIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  backgroundColor: '#66bb6a',
+                  '&:hover': {
+                    backgroundColor: '#43a047',
+                  },
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5,
+                  fontSize: '0.75rem',
+                  textTransform: 'none'
+                }}
+              >
+                Find
+              </Button>
+            </Tooltip>
 
-          <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+            <Tooltip title="Set Cell Validation">
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => setValidationDialog(true)}
+                disabled={!selectedRange}
+                startIcon={<RuleIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  backgroundColor: '#ffa726',
+                  '&:hover': {
+                    backgroundColor: '#fb8c00',
+                  },
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5,
+                  fontSize: '0.75rem',
+                  textTransform: 'none'
+                }}
+              >
+                Validate
+              </Button>
+            </Tooltip>
 
-          <Button
-            variant="contained"
-            startIcon={isLoading ? <CircularProgress size={20} /> : <SaveIcon />}
-            onClick={onSave}
-            disabled={isLoading}
-            size="small"
-            color="primary"
-          >
-            {isLoading ? 'Loading...' : 'Save'}
-          </Button>
-
+            <Tooltip title="Save Spreadsheet">
+              <Button
+                variant="contained"
+                size="small"
+                onClick={onSave}
+                disabled={isLoading}
+                startIcon={isLoading ? 
+                  <CircularProgress size={16} color="inherit" /> : 
+                  <SaveIcon sx={{ fontSize: 18 }} />
+                }
+                sx={{
+                  backgroundColor: '#ef5350',
+                  '&:hover': {
+                    backgroundColor: '#e53935',
+                  },
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5,
+                  fontSize: '0.75rem',
+                  textTransform: 'none',
+                  '&.Mui-disabled': {
+                    backgroundColor: '#ef5350',
+                    opacity: 0.7,
+                    color: 'white'
+                  }
+                }}
+              >
+                {isLoading ? 'Saving' : 'Save'}
+              </Button>
+            </Tooltip>
+          </Box>
         </Box>
       </Box>
 
@@ -320,8 +405,34 @@ const SpreadsheetToolbar = ({
           </Box>
         </Box>
       </Dialog>
+
+      {/* Validation Dialog */}
+      <Dialog open={validationDialog} onClose={() => setValidationDialog(false)}>
+        <DialogTitle>Set Cell Validation</DialogTitle>
+        <DialogContent>
+          <FormControl>
+            <RadioGroup
+              value={validationType}
+              onChange={(e) => setValidationType(e.target.value)}
+            >
+              <FormControlLabel value="TEXT" control={<Radio />} label="Text" />
+              <FormControlLabel value="NUMBER" control={<Radio />} label="Number" />
+              <FormControlLabel value="EMAIL" control={<Radio />} label="Email" />
+              <FormControlLabel value="DATE" control={<Radio />} label="Date" />
+            </RadioGroup>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setValidationDialog(false)}>Cancel</Button>
+          <Button onClick={handleSetValidation} variant="contained">
+            Apply
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
+
+
 
 export default SpreadsheetToolbar; 
