@@ -9,13 +9,7 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(
-  cors({
-    origin: "*", // Your frontend URL
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
+app.use(cors());
 app.use(express.json({ limit: "10mb" })); // Increased limit for large sheets
 
 app.get("/", (req, res) => {
