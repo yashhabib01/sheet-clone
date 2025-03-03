@@ -11,6 +11,21 @@ A powerful web-based spreadsheet application that mimics core Excel functionalit
 
 This project is a feature-rich spreadsheet application that provides users with Excel-like functionality in a web browser. It supports real-time data manipulation, formula calculations, cell formatting, and data validation.
 
+## Technical Stack
+
+### Frontend
+
+- React with Vite
+- Material-UI (MUI)
+- date-fns for date handling
+
+### Backend
+
+- Node.js
+- Express.js
+- MongoDB with Mongoose
+- CORS for cross-origin support
+
 ## Features
 
 ### 1. Cell Management
@@ -299,22 +314,6 @@ Response:
   }
 ]
 ```
-
-## Technical Stack
-
-### Frontend
-
-- React with Vite
-- Material-UI (MUI)
-- Emotion for styled components
-- date-fns for date handling
-
-### Backend
-
-- Node.js
-- Express.js
-- MongoDB with Mongoose
-- CORS for cross-origin support
 
 ## Suggested Improvements
 
